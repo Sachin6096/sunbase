@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Customers</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        button {
+            padding: 5px 10px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        input {
+            padding: 5px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+<h2>Customer List</h2>
+<input type="text" id="search" placeholder="Search customers...">
+<button onclick="loadCustomers()">Search</button>
+<button onclick="window.location.href='addCustomer.html'">Add Customer</button>
+<button onclick="syncCustomers()">Sync Customers</button>
+<table id="customerTable">
+    <thead>
+    <tr>
+        <th>First Name</th>
+        <th>Last Name</th>
+        <th>Street</th>
+        <th>Address</th>
+        <th>City</th>
+        <th>State</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<script>
+    function loadCustomers() {
+        const token = localStorage.getItem('token');
+        const search = document.getElementById('search').value;
+        fetch(`/api/customers?search=${encodeURIComponent(search)}`, {
+            headers: {
+                'Authorization': 'Bearer ' + token
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            const tableBody = document.getElementById('customerTable').getElementsByTagName('tbody')[0];
+            tableBody.innerHTML = '';
+
+            data.content.forEach(customer => {
+                const row = tableBody.insertRow();
+                row.insertCell(0).innerText = customer.firstName;
+                row.insertCell(1).innerText = customer.lastName;
+                row.insertCell(2).innerText = customer.street;
+                row.insertCell(3).innerText = customer.address;
+                row.insertCell(4).innerText = customer.city;
+                row.insertCell(5).innerText = customer.state;
+                row.insertCell(6).innerText = customer.email;
+                row.insertCell(7).innerText = customer.phone;
+
+                const actionsCell = row.insertCell(8);
+                const deleteButton = document.createElement('button');
+                deleteButton.innerText = 'Delete';
+                deleteButton.onclick = () => deleteCustomer(customer.id);
+                actionsCell.appendChild(deleteButton);
+            });
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    function deleteCustomer(id) {
+        const token = localStorage.getItem('token');
+        fetch(`/api/customers/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': 'Bearer ' + token
+            }
+        })
+        .then(() => loadCustomers())
+        .catch(error => console.error('Error:', error));
+    }
+
+    function syncCustomers() {
+        const token = localStorage.getItem('token');
+        fetch('https://qa.sunbasedata.com/sunbase/portal/api/assignment_auth.jsp', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ login_id: 'test@sunbasedata.com', password: 'Test@123' })
+        })
+        .then(response => response.json())
+        .then(authResponse => {
+            const bearerToken = authResponse.token;
+            fetch('https://qa.sunbasedata.com/sunbase/portal/api/assignment.jsp?cmd=get_customer_list', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + bearerToken
+                }
+            })
+            .then(response => response.json())
+            .then(customers => {
+                customers.forEach(customer => {
+                    fetch('/api/customers', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + token
+                        },
+                        body: JSON.stringify(customer)
+                    });
+                });
+            });
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    window.onload = loadCustomers;
+</script>
+</body>
+</html>
